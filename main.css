@@ -1,0 +1,58 @@
+@import "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css";
+
+body {
+  max-width: 800px;
+  margin:20px auto;
+}
+
+pre {
+  overflow: auto;
+}
+
+nav > a {
+  margin-right: 1em;
+}
+
+header > h1 {
+  text-align: center;
+  margin: 1em auto;
+}
+
+main {
+  margin: 1em 0 3em 0;
+}
+
+main.typo li a {
+  border-bottom: none;
+}
+
+header > nav > #search {
+  display: inline-block;
+}
+
+.toc {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+code {
+  background-color: #ddd;
+  padding: 0 2px;
+}
+
+.highlight td pre {
+  border: none;
+  padding: 1em 0;
+  margin: 0;
+}
+
+.tags a {
+  margin-right: 0.5em;
+}
+
+.meta .tags {
+  display: inline-block;
+}

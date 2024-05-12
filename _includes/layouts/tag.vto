@@ -1,0 +1,10 @@
+---
+title: My Notes
+language: zh-CN
+layout: layouts/layout.vto
+---
+<ol>
+  {{ for page of search.pages(`type=page pin=undefined ${tag}`, "date=desc") }}
+  <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+  {{ /for }}
+</ol>

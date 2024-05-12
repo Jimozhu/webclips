@@ -1,0 +1,18 @@
+---
+title: My Notes
+language: zh-CN
+layout: layouts/layout.vto
+---
+{{ if !pin }}
+<div class="meta">
+  <div data-type="origin_url">
+    <lable>原地址：</lable><a target="_blank" href="{{origin_url}}">{{origin_url}}</a>
+  </div>
+  <div data-type="tags"><lable>Tags：</lable>{{ comp.tags({ tags: tags }) }}</div>
+  <div data-type="date">
+    <lable>创建时间：</lable><time>{{ date |> date('DATETIME') }}</time>
+  </div>
+</div>
+<hr/>
+{{ /if }}
+{{ content }}
