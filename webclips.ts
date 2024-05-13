@@ -1,52 +1,19 @@
 #!/usr/bin/env -S deno run -A
 
+import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+
 import { parseArgs } from "https://deno.land/std@0.223.0/cli/parse_args.ts";
 import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
-import { DOMParser, Document } from "npm:linkedom@0.16.11";
-import Turndown from "npm:turndown@^7.1.3";
+import { existsSync } from "https://deno.land/std/fs/mod.ts";
+import { DOMParser } from "npm:linkedom@0.16.11";
+import Turndown from "npm:turndown@^7.2.0";
 
-const flags = parseArgs(Deno.args, {
-  string: ["d", "s"],
-});
-
-const sources: Set<string> = new Set();
-const destDir = flags.d;
-
-if (!destDir) {
-  console.error("缺少参数 -d");
-  Deno.exit(1);
-}
-
-if (flags.s) {
-  sources.add(flags.s);
-}
-if (flags._.length > 0) {
-  flags._.forEach((source) => {
-    if (typeof source === "string") {
-      sources.add(source);
-    }
-  });
-}
-
-console.log(sources, destDir);
-
-const sourcesFiles = new Set<string>();
-for (const source of sources) {
-  // check if source is a file or directory
-  const stat = Deno.statSync(source);
-  if (stat.isFile) {
-    sourcesFiles.add(source);
-  } else {
-    // if source is directory, read all html files
-    // and convert them to markdown
-    const files = Deno.readDir(source);
-    for await (const file of files) {
-      const name = file.name;
-      if (file.isFile && (name.endsWith(".html") || name.endsWith(".htm")) && !name.startsWith("index.htm")) {
-        sourcesFiles.add(path.join(source, name));
-      }
-    }
-  }
+function isHTMLClipFileToBeProcessed(filepath: string, dest: string, overWriteExist: boolean) {
+  const name = path.basename(filepath);
+  const ext = path.extname(name);
+  const isHMTL = (ext === ".html" || ext === ".htm") && !name.startsWith("index.htm");
+  const isExist = existsSync(path.join(dest, name.replace(ext, ".md")));
+  return isHMTL && (!isExist || overWriteExist);
 }
 
 const extractTimeAndURL = (document: any) => {
@@ -74,21 +41,42 @@ const extractTimeAndURL = (document: any) => {
   return [time, url];
 };
 
-const turndown = new Turndown();
-for (const source of sourcesFiles) {
-  const file = await Deno.readTextFile(source);
-  const dom = new DOMParser().parseFromString(file, "text/html");
-  const title = dom.querySelector("title").textContent;
-  const [time, url] = extractTimeAndURL(dom);
-  // console.log(source, title, time, url);
-  const content = dom.querySelector("main.typo");
-  if (content) {
-    let md = turndown.turndown(content);
-    if (!md) {
-      console.error(`无法转换 ${source}`);
-      continue;
+async function transformWeblips({ dest, overwrite }: { dest: string; overwrite: boolean; }, ...inputs: string[]) {
+  const sourcesFiles = new Set<string>();
+
+  for (const input of inputs) {
+    const stat = Deno.statSync(input);
+    if (stat.isFile) {
+      if (isHTMLClipFileToBeProcessed(input, dest, overwrite)) {
+        sourcesFiles.add(input);
+      }
+    } else {
+      const files = Deno.readDir(input);
+      for await (const file of files) {
+        const filepath = path.join(input, file.name);
+        if (file.isFile && isHTMLClipFileToBeProcessed(filepath, dest, overwrite)) {
+          sourcesFiles.add(filepath);
+        }
+      }
     }
-    md = `---
+  }
+
+  const turndown = new Turndown({ option: { headingStyle: "atx", hr: "---", codeBlockStyle: "fenced", preformattedCode: true } });
+  for (const source of sourcesFiles) {
+    console.log(`处理 ${source}`);
+    const file = await Deno.readTextFile(source);
+    const dom = new DOMParser().parseFromString(file, "text/html");
+    const title = dom.querySelector("title").textContent;
+    const [time, url] = extractTimeAndURL(dom);
+    // console.log(source, title, time, url);
+    const content = dom.querySelector("main.typo");
+    if (content) {
+      let md = turndown.turndown(content);
+      if (!md) {
+        console.error(`无法转换 ${source}`);
+        continue;
+      }
+      md = `---
 title: "${title}"
 date: ${time}
 categories: [other]
@@ -97,10 +85,26 @@ origin_url: ${url}
 ---
 ${md}
     `;
-    const name = path.basename(source);
-    const dest = path.join(destDir, name.replace(".html", ".md"));
-    await Deno.writeTextFile(dest, md);
-  } else {
-    console.error(`无法解析 ${source}`);
+      const name = path.basename(source);
+      const destFile = path.join(dest, name.replace(".html", ".md"));
+      await Deno.writeTextFile(destFile, md);
+    } else {
+      console.error(`无法解析 ${source}`);
+    }
   }
+
 }
+
+await new Command()
+  .name("webclips")
+  .version("0.0.2")
+  .description("transform html webclips to markdown")
+  .option("-d, --dest <dest:string>", "output dir.", {
+    default: "./pages",
+  })
+  .option("-o, --overwrite [overwrite:boolean]", "overwrite exist files.", {
+    default: false,
+  })
+  .arguments("<input...:file>")
+  .action(transformWeblips)
+  .parse(Deno.args);

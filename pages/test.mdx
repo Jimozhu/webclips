@@ -1,0 +1,25 @@
+---
+title: Hello world MDX
+description: This is a description
+url: ./test-mdx.html
+---
+export const Col = ({ title, children }) => {
+  return (
+    <div
+      className={`bg-bg-1 dark:bg-bgDark-1 px-2 h-full place-content-center w-full mx-auto`}
+    >
+      {title && <h2 className="text-2xl font-semibold mb-2 mt-2">{title}</h2>}
+      {children}
+    </div>
+  );
+};
+
+This is a markdown file with the title **{ title }**.
+
+<Tweets id="1779378108464058416"></Tweets>
+<Col title="xxx">Col</Col>
+s
+
+<twx id="abc" href="xxx"/>
+
+sss df
