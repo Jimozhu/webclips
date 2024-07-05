@@ -10,15 +10,19 @@ import { full as emoji } from "npm:markdown-it-emoji";
 import markdownItAttrs from "npm:markdown-it-attrs";
 
 import Tweets from "./_components/Tweets.tsx";
+import { SiteOptions } from "lume/core/site.ts";
 
+const isGitHubActions = Deno.env.get("GITHUB_ACTIONS") === "true";
 const markdown = {
   plugins: [emoji, markdownItAttrs],
 };
-
-const site = lume({
-  location: new URL("https://myserver.com:8787/notes"),
+const locationURL = isGitHubActions ? "https://jimozhu.github.io/webclips" : "https://myserver.com:8787/notes";
+const options: Partial<SiteOptions> = {
   prettyUrls: false,
-}, { markdown });
+  location: new URL(locationURL),
+};
+
+const site = lume(options, { markdown });
 
 site.use(basePath());
 site.use(prism());
