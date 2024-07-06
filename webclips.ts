@@ -1,22 +1,28 @@
 #!/usr/bin/env -S deno run -A
 
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { ActionHandler, Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { htmlToMarkdown } from "jsr:@pinkrabbit/packages";
 
-import { parseArgs } from "https://deno.land/std@0.223.0/cli/parse_args.ts";
-import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
-import { existsSync } from "https://deno.land/std/fs/mod.ts";
+import type { Node, Root, Link, VFile } from "npm:mdast@3.0.0";
+import {
+  type Plugin,
+  type Transformer,
+} from "npm:unified@11.0.5";
+import { visit, type Visitor } from "npm:unist-util-visit@5.0.0";
+
+
+import * as path from "jsr:@std/path@^0.224.0";
+import { existsSync } from "jsr:@std/fs@^0.224.0";
 import { DOMParser } from "npm:linkedom@0.16.11";
-import Turndown from "npm:turndown@^7.2.0";
 
-function isHTMLClipFileToBeProcessed(filepath: string, dest: string, overWriteExist: boolean) {
-  const name = path.basename(filepath);
-  const ext = path.extname(name);
-  const isHMTL = (ext === ".html" || ext === ".htm") && !name.startsWith("index.htm");
-  const isExist = existsSync(path.join(dest, name.replace(ext, ".md")));
-  return isHMTL && (!isExist || overWriteExist);
+function buildLumeSite() {
+  const command = new Deno.Command("deno", {
+    args: ["task", "build"],
+  });
+  command.outputSync();
 }
 
-const extractTimeAndURL = (document: any) => {
+const extractTimeAndURL = (document: Document) => {
   const labelElements = document.querySelectorAll('footer>label');
   let time = null;
   if (labelElements?.length > 1) {
@@ -26,7 +32,7 @@ const extractTimeAndURL = (document: any) => {
 
     // 使用正则表达式匹配时间部分，这里假设时间格式为YYYY-MM-DD HH:mm:ss
     const timeRegex = /(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/;
-    const match = labelText.match(timeRegex);
+    const match = labelText?.match(timeRegex);
 
     if (match) {
       time = match[0];
@@ -41,64 +47,83 @@ const extractTimeAndURL = (document: any) => {
   return [time, url];
 };
 
-async function transformWeblips({ dest, overwrite }: { dest: string; overwrite: boolean; }, ...inputs: string[]) {
-  const sourcesFiles = new Set<string>();
-
-  for (const input of inputs) {
-    const stat = Deno.statSync(input);
-    if (stat.isFile) {
-      if (isHTMLClipFileToBeProcessed(input, dest, overwrite)) {
-        sourcesFiles.add(input);
-      }
-    } else {
-      const files = Deno.readDir(input);
-      for await (const file of files) {
-        const filepath = path.join(input, file.name);
-        if (file.isFile && isHTMLClipFileToBeProcessed(filepath, dest, overwrite)) {
-          sourcesFiles.add(filepath);
-        }
-      }
+const WebClipFixPlugin: Plugin<[], Root> = function () {
+  const visitor: Visitor<Link> = (
+    node: Node,
+    index?: number,
+    parent?: Node,
+  ) => {
+    const url: string = node.url ?? '';
+    const isZhihu = url.includes('zhihu.com/search');
+    if (parent && typeof index === 'number' && isZhihu) {
+      parent.children[index] = {
+        type: 'text',
+        value: node.children.map((child: { value: string; }) => child.value).join(''),
+      };
     }
-  }
+  };
+  const transformer: Transformer<Root> = (tree: Node, _: VFile) => {
+    visit(tree, (node: Node) => node.type === "link", visitor);
+  };
 
-  const turndown = new Turndown({ option: { headingStyle: "atx", hr: "---", codeBlockStyle: "fenced", preformattedCode: true } });
-  for (const source of sourcesFiles) {
-    console.log(`处理 ${source}`);
-    const file = await Deno.readTextFile(source);
-    const dom = new DOMParser().parseFromString(file, "text/html");
-    const title = dom.querySelector("title").textContent;
-    const [time, url] = extractTimeAndURL(dom);
-    // console.log(source, title, time, url);
-    const content = dom.querySelector("main.typo");
-    if (content) {
-      let md = turndown.turndown(content);
+  return transformer;
+};
+
+async function transformWeblips({ dest, overwrite, build }: { dest: string; overwrite: boolean; build: boolean; }, ...inputs: string[]) {
+  for (const input of inputs) {
+    console.log(`处理 ${input}`, { dest, overwrite, build });
+    const name = path.basename(input);
+    const destFile = path.join(dest, name.replace(".html", ".md"));
+    const isExist = existsSync(destFile);
+    if (!isExist || overwrite) {
+      const html = await Deno.readTextFile(input);
+      const md = await htmlToMarkdown(html, { remarkPlugins: [WebClipFixPlugin] });
+
       if (!md) {
-        console.error(`无法转换 ${source}`);
+        console.log(`无法转换 ${input}`);
         continue;
       }
-      md = `---
-title: "${title}"
+
+      const dom = new DOMParser().parseFromString(html, "text/html");
+      const title = dom.querySelector("title").textContent;
+      const [time, url] = extractTimeAndURL(dom as unknown as Document);
+      const content = `---
+title: ${title}
 date: ${time}
-categories: [other]
-tags: []
-origin_url: ${url}
+categories:
+  - webclip
+tags:
+  - webclip
+origin_url: '${url}'
 ---
-${md}
-    `;
-      const name = path.basename(source);
-      const destFile = path.join(dest, name.replace(".html", ".md"));
-      await Deno.writeTextFile(destFile, md);
-    } else {
-      console.error(`无法解析 ${source}`);
+      
+      ${md}
+      
+        `;
+      Deno.writeTextFileSync(destFile, content, { create: true });
     }
   }
 
+  if (build) {
+    buildLumeSite();
+  }
 }
+
+const prettyMarkdown: ActionHandler = ({ overwrite, build }: { overwrite: boolean; build: boolean; }, ...inputs: string[]) => {
+  for (const input of inputs) {
+    console.log(`处理 ${input}`, { overwrite, build });
+  }
+};
 
 await new Command()
   .name("webclips")
   .version("0.0.2")
-  .description("transform html webclips to markdown")
+  .description("command line tool for webclips")
+  .globalOption("-b, --build [build:boolean]", "build lume site.", { default: false })
+  .action(function () {
+    this.showHelp();
+  })
+  .command("transform <input...:file>", "transform html webclips to markdown")
   .option("-d, --dest <dest:string>", "output dir.", {
     default: "./pages",
   })
@@ -107,4 +132,10 @@ await new Command()
   })
   .arguments("<input...:file>")
   .action(transformWeblips)
+  .command("pretty <input...:file>", "pretty markdown webclips")
+  .option("-o, --overwrite [overwrite:boolean]", "overwrite exist files.", {
+    default: true,
+  })
+  .arguments("<input...:file>")
+  .action(prettyMarkdown)
   .parse(Deno.args);
