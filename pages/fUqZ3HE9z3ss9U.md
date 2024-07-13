@@ -49,10 +49,7 @@ function Counter() {
 
 Signal 可以表示包装在响应式里层的任意 JS 值类型，你可以创建一个带有初始值的 signal，然后可以随意读和更新它:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 import { signal } from '@preact/signals-core';
 
 const s = signal(0);
@@ -66,10 +63,7 @@ console.log(s.value); // Console: 1
 
 Computed Signals 通过 `computed(fn)` 函数从其它 signals 中派生出新的 signals 对象:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 import { signal, computed } from '@preact/signals-core';
 
 const s1 = signal('hello');
@@ -82,10 +76,7 @@ const c = computed(() => {
 
 不过需要注意的是，`computed` 这个函数在这里并不会立即执行，因为按照 Preact 的设计原则，`computed signals` 被规定为懒执行的 (这个后面会介绍)，它只有在本身值被读取的时候才会触发执行，同时它本身也是只可读的:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 console.log(c.value) // hello world
 ```
 
@@ -95,10 +86,7 @@ console.log(c.value) // hello world
 
 同样，一个 `computed signal` 也可以被其它的 `computed signal` 消费:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 const count = signal(1);
 const double = computed(() => count.value * 2);
 const quadruple = computed(() => double.value * 2);
@@ -110,10 +98,7 @@ console.log(quadruple.value); // Console: 80
 
 同时 `computed` 依赖的 signals 也并不需要是静态的，它只会对最新的依赖变更发生重新执行:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 const choice = signal(true);
 const funk = signal("Uptown");
 const purple = signal("Haze"); 
@@ -147,10 +132,7 @@ c.value; // effect doesn't run
 
 和 `Computed Signals` 一样的是，`Effect Signals` 同样也会对依赖进行追踪。但 Effect 则不会懒执行，与之相反，它会在创建的时候立即执行，然后当它追踪的依赖值发生变化的时候，它会随着变化而更新:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 import { signal, computed, effect } from '@preact/signals-core';
 
 const count = signal(1);
@@ -171,10 +153,7 @@ count.value = 20; // is now 80
 
 如果你只想调用一次 `effect` 函数，那么可以把它赋值为一个函数调用，等到这个函数执行完，这个 `effect` 也会一起结束:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 const count = signal(1);
 const double = computed(() => count.value * 2);
 const quadruple = computed(() => double.value * 2);
@@ -191,10 +170,7 @@ count.value = 20;
 
 用于将多个值的更新在回调结束时合成为一个。batch 的处理可以被嵌套，并且只有当最外层的处理回调完成后，更新才会刷新:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 const name = signal('Dong');
 const surname = signal('Zoom');
 
@@ -236,10 +212,7 @@ Preact Signals 在早期版本中使用到了 JS 的 `Set` 对象去处理这种
 
 同时 `Sets` 中也有个属性，它们是按照插入顺序来进行迭代。这对于 Signals 中处理缓存的情况会很方便，但也有些情况下，Signals 插入的顺序并不是总保持不变的，例如以下情况:
 
-```
-ini
- 代码解读
-复制代码
+```ts
 const s1 = signal(0)
 const s2 = signal(0)
 const s3 = signal(0)
@@ -301,10 +274,7 @@ Effect 如果想调度它自身，需要有个排序好的调度表。Preact 给
 
 `computed` signals 实际上并不总是从他们的依赖关系中获取通知的。只有当有像 effect 这样的东西在监听 signals 本身时，compute signals 才会订阅依赖通知。这避免了下面的一些情况:
 
-```
-ini
- 代码解读
-复制代码
+```ts
 const s = signal(0);
 
 {
@@ -353,10 +323,7 @@ Signal 在 Preact JSX 语法进行传值的时候，可以直接传对应的 Sig
 
 例如以下组件:
 
-```
-ts
- 代码解读
-复制代码
+```ts
 import { render } from 'preact'
 import { signal } from '@preact/signals'
 
@@ -404,7 +371,5 @@ Preact Signals 本身在状态管理上区别于 React Hooks 上的一个点在�
 ## 参考资料
 
 * [Why Signals Are Better Than React Hooks](https://www.youtube.com/watch?v=SO8lBVWF2Y8 "https://www.youtube.com/watch?v=SO8lBVWF2Y8")
+
 * [preactjs.com/guide/v10/s…](https://preactjs.com/guide/v10/signals/ "https://preactjs.com/guide/v10/signals/")
-
-
-  

@@ -5,15 +5,19 @@ import { htmlToMarkdown } from "jsr:@pinkrabbit/packages";
 
 import type { Node, Root, Link, VFile } from "npm:mdast@3.0.0";
 import {
+  unified,
   type Plugin,
   type Transformer,
 } from "npm:unified@11.0.5";
+import remarkParse from "npm:remark-parse";
 import { visit, type Visitor } from "npm:unist-util-visit@5.0.0";
 
 
 import * as path from "jsr:@std/path@^0.224.0";
 import { existsSync } from "jsr:@std/fs@^0.224.0";
 import { DOMParser } from "npm:linkedom@0.16.11";
+import remarkStringify from "npm:remark-stringify@11.0.0";
+import remarkFrontmatter from 'npm:remark-frontmatter';
 
 function buildLumeSite() {
   const command = new Deno.Command("deno", {
@@ -75,17 +79,16 @@ const CodeBlockFixPlugin: Plugin<[], Root> = function () {
     index?: number,
     parent?: Node,
   ) => {
-    const url: string = node.url ?? '';
-    const isZhihu = url.includes('zhihu.com/search');
-    if (parent && typeof index === 'number' && isZhihu) {
-      parent.children[index] = {
-        type: 'text',
-        value: node.children.map((child: { value: string; }) => child.value).join(''),
-      };
+    console.log(node);
+    let code = node.value;
+    const lang = node.value.match(/^([a-zA-Z]{2,10})\s*代码解读/)?.[1];
+    if (lang) {
+      node.lang = lang;
     }
+    node.value = code.replace(/^[a-zA-Z\s]*代码解读\s*复制代码/g, '').trim();
   };
   const transformer: Transformer<Root> = (tree: Node, _: VFile) => {
-    visit(tree, (node: Node) => node.type === "link", visitor);
+    visit(tree, (node: Node) => node.type === "code", visitor);
   };
 
   return transformer;
@@ -131,11 +134,22 @@ origin_url: '${url}'
   }
 }
 
-const prettyMarkdown: ActionHandler = async ({ overwrite, build }: { overwrite: boolean; build: boolean; }, ...inputs: string[]) => {
+function fixMarkdown(md: string) {
+  const file = unified()
+    .use(remarkParse, { commonmark: true })
+    .use(remarkFrontmatter, ["yaml"])
+    .use(remarkStringify)
+    .use(CodeBlockFixPlugin)
+    .processSync(md);
+
+  return String(file);
+}
+
+const prettyMarkdown: ActionHandler = ({ overwrite, build }: { overwrite: boolean; build: boolean; }, ...inputs: string[]) => {
   for (const input of inputs) {
     console.log(`处理 ${input}`, { overwrite, build });
     const content = Deno.readTextFileSync(input);
-    const md = await htmlToMarkdown(content, { remarkPlugins: [WebClipFixPlugin] });
+    const md = fixMarkdown(content);
     Deno.writeTextFileSync(input, md);
   }
 };
