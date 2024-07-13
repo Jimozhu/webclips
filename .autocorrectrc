@@ -5,7 +5,7 @@ rules:
 # Enable or disable in special context
 context:
   # Enable or disable to format codeblock in Markdown or AsciiDoc etc.
-  codeblock: 1
+  codeblock: 0
 textRules:
   # Config some special rule for some texts
   # For example, if we wants to let "Hello你好" just warning, and "Hi你好" to ignore
@@ -15,8 +15,9 @@ fileTypes:
   # Config the files associations, you config is higher priority than default.
   # "rb": ruby
   # "Rakefile": ruby
-  # "*.js": javascript
-  # ".mdx": markdown
+  "*.js": javascript
+  "*.js": typescript
+  ".md": markdown
 spellcheck:
   words:
     # Please do not add a general English word (eg. apple, python) here.

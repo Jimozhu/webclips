@@ -69,6 +69,28 @@ const WebClipFixPlugin: Plugin<[], Root> = function () {
   return transformer;
 };
 
+const CodeBlockFixPlugin: Plugin<[], Root> = function () {
+  const visitor: Visitor<Link> = (
+    node: Node,
+    index?: number,
+    parent?: Node,
+  ) => {
+    const url: string = node.url ?? '';
+    const isZhihu = url.includes('zhihu.com/search');
+    if (parent && typeof index === 'number' && isZhihu) {
+      parent.children[index] = {
+        type: 'text',
+        value: node.children.map((child: { value: string; }) => child.value).join(''),
+      };
+    }
+  };
+  const transformer: Transformer<Root> = (tree: Node, _: VFile) => {
+    visit(tree, (node: Node) => node.type === "link", visitor);
+  };
+
+  return transformer;
+};
+
 async function transformWeblips({ dest, overwrite, build }: { dest: string; overwrite: boolean; build: boolean; }, ...inputs: string[]) {
   for (const input of inputs) {
     console.log(`处理 ${input}`, { dest, overwrite, build });
@@ -109,9 +131,12 @@ origin_url: '${url}'
   }
 }
 
-const prettyMarkdown: ActionHandler = ({ overwrite, build }: { overwrite: boolean; build: boolean; }, ...inputs: string[]) => {
+const prettyMarkdown: ActionHandler = async ({ overwrite, build }: { overwrite: boolean; build: boolean; }, ...inputs: string[]) => {
   for (const input of inputs) {
     console.log(`处理 ${input}`, { overwrite, build });
+    const content = Deno.readTextFileSync(input);
+    const md = await htmlToMarkdown(content, { remarkPlugins: [WebClipFixPlugin] });
+    Deno.writeTextFileSync(input, md);
   }
 };
 
