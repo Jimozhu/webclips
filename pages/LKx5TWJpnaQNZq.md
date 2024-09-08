@@ -1,5 +1,5 @@
 ---
-title: Darwin Machines
+title: Darwin Machines - 达尔文机器理论
 date: 2024-07-19T01:23:00.000Z
 categories:
   - webclip
